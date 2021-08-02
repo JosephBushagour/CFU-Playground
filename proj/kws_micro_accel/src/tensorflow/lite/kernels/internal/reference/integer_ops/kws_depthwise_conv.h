@@ -14,6 +14,7 @@ limitations under the License.
 #define TENSORFLOW_LITE_KERNELS_INTERNAL_REFERENCE_INTEGER_OPS_KWS_DEPTHWISE_CONV_H_
 
 #include "tensorflow/lite/kernels/internal/common.h"
+#include "cfu.h"
 
 namespace tflite {
 namespace reference_integer_ops {
@@ -41,7 +42,7 @@ inline void KwsDepthwiseConvPerChannel(
   const int pad_width = params.padding_values.width;
   const int pad_height = params.padding_values.height;
   const int depth_multiplier = params.depth_multiplier;
-  const int32_t input_offset = params.input_offset;
+  // const int32_t input_offset = params.input_offset;
   const int32_t output_offset = params.output_offset;
   const int32_t output_activation_min = params.quantized_activation_min;
   const int32_t output_activation_max = params.quantized_activation_max;
@@ -72,7 +73,7 @@ inline void KwsDepthwiseConvPerChannel(
             const int output_channel = m + in_channel * depth_multiplier;
             const int in_x_origin = (out_x * stride_width) - pad_width;
             const int in_y_origin = (out_y * stride_height) - pad_height;
-            int32_t acc = 0;
+            int32_t acc = cfu_op0(1, 0, 0);
             for (int filter_y = 0; filter_y < filter_height; ++filter_y) {
               for (int filter_x = 0; filter_x < filter_width; ++filter_x) {
                 const int in_x = in_x_origin + filter_x;
@@ -83,11 +84,12 @@ inline void KwsDepthwiseConvPerChannel(
                     (in_x >= 0) && (in_x < input_width) && (in_y >= 0) &&
                     (in_y < input_height);
                 if (is_point_inside_image) {
-                  int32_t input_val = input_data[Offset(
+                  int8_t input_val = input_data[Offset(
                       input_shape, batch, in_y, in_x, in_channel)];
-                  int32_t filter_val = filter_data[Offset(
+                  int8_t filter_val = filter_data[Offset(
                       filter_shape, 0, filter_y, filter_x, output_channel)];
-                  acc += filter_val * (input_val + input_offset);
+                  acc = cfu_op1(0, input_val, filter_val);
+                  // acc += filter_val * (input_val + input_offset);
                 }
               }
             }

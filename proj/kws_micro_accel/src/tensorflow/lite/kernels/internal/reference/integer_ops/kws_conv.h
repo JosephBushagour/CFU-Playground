@@ -20,16 +20,16 @@ namespace tflite {
 namespace reference_integer_ops {
 
 #if defined(OPT_LINK_OPS_IN_SRAM) || defined(ALL_OPTIMIZATIONS)
-static void KwsConvPerChannel(
+inline void KwsConvPerChannel(
     const int32_t* output_multiplier,
     const int32_t* output_shift, const RuntimeShape& input_shape,
     const int8_t* input_data, const RuntimeShape& filter_shape,
     const int8_t* filter_data,
     const int32_t* bias_data, const RuntimeShape& output_shape,
     int8_t* output_data)
-    __attribute__((section(".ramtext")));  // Inlined to be in SRAM.
+    __attribute__((always_inline));  // Inlined to be in SRAM.
 #endif
-static void KwsConvPerChannel(
+inline void KwsConvPerChannel(
     const int32_t* output_multiplier,
     const int32_t* output_shift, const RuntimeShape& input_shape,
     const int8_t* input_data, const RuntimeShape& filter_shape,

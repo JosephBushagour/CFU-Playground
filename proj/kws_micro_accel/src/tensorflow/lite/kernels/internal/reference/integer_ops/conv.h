@@ -68,8 +68,8 @@ inline void ConvPerChannel(
       bias_data != NULL) {
     if (input_depth == 64 && stride_width == 1 && stride_height == 1 &&
         pad_height == 0 && pad_width == 0) {
-      KwsConvPerChannel(params, output_multiplier, output_shift, input_shape,
-                        input_data, filter_shape, filter_data, bias_shape,
+      KwsConvPerChannel(output_multiplier, output_shift, input_shape,
+                        input_data, filter_shape, filter_data,
                         bias_data, output_shape, output_data);
       return;
     }

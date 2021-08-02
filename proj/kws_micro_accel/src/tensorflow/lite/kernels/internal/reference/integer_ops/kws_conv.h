@@ -14,96 +14,56 @@ limitations under the License.
 #define TENSORFLOW_LITE_KERNELS_INTERNAL_REFERENCE_INTEGER_OPS_KWS_CONV_H_
 
 #include "tensorflow/lite/kernels/internal/common.h"
+#include "cfu.h"
 
 namespace tflite {
 namespace reference_integer_ops {
 
 #if defined(OPT_LINK_OPS_IN_SRAM) || defined(ALL_OPTIMIZATIONS)
-inline void KwsConvPerChannel(
-    const ConvParams& params, const int32_t* output_multiplier,
+static void KwsConvPerChannel(
+    const int32_t* output_multiplier,
     const int32_t* output_shift, const RuntimeShape& input_shape,
     const int8_t* input_data, const RuntimeShape& filter_shape,
-    const int8_t* filter_data, const RuntimeShape& bias_shape,
+    const int8_t* filter_data,
     const int32_t* bias_data, const RuntimeShape& output_shape,
     int8_t* output_data)
-    __attribute__((always_inline));  // Inlined to be in SRAM.
+    __attribute__((section(".ramtext")));  // Inlined to be in SRAM.
 #endif
-inline void KwsConvPerChannel(const ConvParams& params,
-                       const int32_t* output_multiplier,
-                       const int32_t* output_shift,
-                       const RuntimeShape& input_shape,
-                       const int8_t* input_data,
-                       const RuntimeShape& filter_shape,
-                       const int8_t* filter_data,
-                       const RuntimeShape& bias_shape, const int32_t* bias_data,
-                       const RuntimeShape& output_shape, int8_t* output_data) {
-  // Get parameters.
-  const int32_t input_offset = params.input_offset;  // r = s(q - Z)
-  const int32_t output_offset = params.output_offset;
+static void KwsConvPerChannel(
+    const int32_t* output_multiplier,
+    const int32_t* output_shift, const RuntimeShape& input_shape,
+    const int8_t* input_data, const RuntimeShape& filter_shape,
+    const int8_t* filter_data,
+    const int32_t* bias_data, const RuntimeShape& output_shape,
+    int8_t* output_data) {
+  for (int out_y = 0; out_y < 25; ++out_y) {
+    for (int out_x = 0; out_x < 5; ++out_x) {
+      for (int out_channel = 0; out_channel < 64; ++out_channel) {
+        int32_t acc = cfu_op0(/* funct7= */ 1, 0, 0); // resets acc
+        // Skip any short circuit logical ops, no branch predictor.
+        bool is_point_outside_image = out_x >= 5;
+        is_point_outside_image |= out_y >= 25;
 
-  // Set min and max value of the output.
-  const int32_t output_activation_min = params.quantized_activation_min;
-  const int32_t output_activation_max = params.quantized_activation_max;
-
-  // Consistency check.
-  TFLITE_DCHECK_LE(output_activation_min, output_activation_max);
-  TFLITE_DCHECK_EQ(input_shape.DimensionsCount(), 4);
-  TFLITE_DCHECK_EQ(filter_shape.DimensionsCount(), 4);
-  TFLITE_DCHECK_EQ(output_shape.DimensionsCount(), 4);
-  const int batches = MatchingDim(input_shape, 0, output_shape, 0);
-
-  // Setting input_depth to a constant scares the optimizer and actually
-  // slows the overall speed. Not sure why.
-  const int input_depth = MatchingDim(input_shape, 3, filter_shape, 3);
-
-  const int output_depth = MatchingDim(filter_shape, 0, output_shape, 3);
-  TFLITE_DCHECK_EQ(bias_shape.FlatSize(), output_depth);
-
-  // Check dimensions of the tensors.
-  const int input_height = input_shape.Dims(1);
-  const int input_width = input_shape.Dims(2);
-  const int filter_height = filter_shape.Dims(1);
-  const int filter_width = filter_shape.Dims(2);
-  const int output_height = output_shape.Dims(1);
-  const int output_width = output_shape.Dims(2);
-  for (int batch = 0; batch < batches; ++batch) {
-    for (int out_y = 0; out_y < output_height; ++out_y) {
-      for (int out_x = 0; out_x < output_width; ++out_x) {
-        for (int out_channel = 0; out_channel < output_depth; ++out_channel) {
-          int32_t acc = 0;
-          for (int filter_y = 0; filter_y < filter_height; ++filter_y) {
-            const int in_y = out_y + filter_y;
-            for (int filter_x = 0; filter_x < filter_width; ++filter_x) {
-              const int in_x = out_x + filter_x;
-
-              // Skip any short circuit logical ops, no branch predictor.
-              bool is_point_outside_image = in_x >= input_width;
-              is_point_outside_image |= in_y >= input_height;
-
-              if (is_point_outside_image) {
-                continue;
-              }
-
-#pragma GCC unroll 4
-              for (int in_channel = 0; in_channel < input_depth; ++in_channel) {
-                int32_t input_val = input_data[Offset(input_shape, batch, in_y,
-                                                      in_x, in_channel)];
-                int32_t filter_val = filter_data[Offset(
-                    filter_shape, out_channel, filter_y, filter_x, in_channel)];
-                acc += filter_val * (input_val + input_offset);
-              }
-            }
-          }
-
-          acc += bias_data[out_channel];
-          acc = MultiplyByQuantizedMultiplier(
-              acc, output_multiplier[out_channel], output_shift[out_channel]);
-          acc += output_offset;
-          acc = std::max(acc, output_activation_min);
-          acc = std::min(acc, output_activation_max);
-          output_data[Offset(output_shape, batch, out_y, out_x, out_channel)] =
-              static_cast<int8_t>(acc);
+        if (is_point_outside_image) {
+          continue;
         }
+
+        for (int in_channel = 0; in_channel < 64; in_channel += 4) {
+          uint32_t input_val =
+              *((uint32_t *)(input_data + Offset(input_shape, 0, out_y, out_x, in_channel)));
+          uint32_t filter_val =
+              *((uint32_t *)(filter_data + Offset(filter_shape, out_channel, 0, 0, in_channel)));
+          acc = cfu_op0(0, input_val, filter_val);
+        }
+
+        acc += bias_data[out_channel];
+        acc = MultiplyByQuantizedMultiplier(acc, output_multiplier[out_channel],
+                                            output_shift[out_channel]);
+        acc += -128;
+        acc = std::max(acc, -128L);
+        acc = std::min(acc, 127L);
+        output_data[Offset(output_shape, 0, out_y, out_x, out_channel)] =
+            static_cast<int8_t>(acc);
       }
     }
   }

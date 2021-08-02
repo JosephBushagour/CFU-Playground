@@ -16,16 +16,19 @@ limitations under the License.
 #define TENSORFLOW_LITE_KERNELS_INTERNAL_REFERENCE_INTEGER_OPS_DEPTHWISE_CONV_H_
 
 #include "tensorflow/lite/kernels/internal/common.h"
+#include "tensorflow/lite/kernels/internal/reference/integer_ops/kws_depthwise_conv.h"
 
 namespace tflite {
 namespace reference_integer_ops {
 
 #if defined(OPT_LINK_OPS_IN_SRAM) || defined(ALL_OPTIMIZATIONS)
-inline void DepthwiseConvPerChannel(
-    const DepthwiseParams&, const int32_t*, const int32_t*,
-    const RuntimeShape&, const int8_t*, const RuntimeShape&, const int8_t*,
-    const RuntimeShape&, const int32_t*, const RuntimeShape&, int8_t*
-    ) __attribute__((always_inline));  // Must be inlined to be in SRAM.
+inline void DepthwiseConvPerChannel(const DepthwiseParams&, const int32_t*,
+                                    const int32_t*, const RuntimeShape&,
+                                    const int8_t*, const RuntimeShape&,
+                                    const int8_t*, const RuntimeShape&,
+                                    const int32_t*, const RuntimeShape&,
+                                    int8_t*)
+    __attribute__((always_inline));  // Must be inlined to be in SRAM.
 #endif
 inline void DepthwiseConvPerChannel(
     const DepthwiseParams& params, const int32_t* output_multiplier,
@@ -65,6 +68,21 @@ inline void DepthwiseConvPerChannel(
   const int output_width = output_shape.Dims(2);
   TFLITE_DCHECK_EQ(output_depth, input_depth * depth_multiplier);
   TFLITE_DCHECK_EQ(bias_shape.FlatSize(), output_depth);
+
+#if defined(OPT_ACCEL_DEPTHWISE_CONV) || defined(ALL_OPTIMIZATIONS)
+  bool can_optimize;
+  can_optimize = dilation_width_factor == 1;
+  can_optimize &= dilation_height_factor == 1;
+  can_optimize &= depth_multiplier == 1;
+
+  if (can_optimize) {
+    KwsDepthwiseConvPerChannel(params, output_multiplier, output_shift,
+                               input_shape, input_data, filter_shape,
+                               filter_data, bias_shape, bias_data, output_shape,
+                               output_data);
+    return;
+  }
+#endif
 
   for (int batch = 0; batch < batches; ++batch) {
     for (int out_y = 0; out_y < output_height; ++out_y) {

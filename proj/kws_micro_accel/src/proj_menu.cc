@@ -118,8 +118,10 @@ static void do_cfu_tests() {
 }
 
 static void perform_setup() {
+#ifdef CSR_SPIFLASH_PHY_BASE
   puts("Setting SPI divisor.");
   spiflash_phy_clk_divisor_write(0);
+#endif // CSR_SPIFLASH_PHY_BASE
 }
 
 struct Menu MENU = {

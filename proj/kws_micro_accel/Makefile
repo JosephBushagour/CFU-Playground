@@ -28,6 +28,7 @@ DEFINES += NDEBUG
 # Uncomment to include specific optimizations
 #DEFINES += OPT_LINK_OPS_IN_SRAM
 #DEFINES += OPT_LINK_MODEL_IN_SRAM
+#DEFINES += OPT_ACCEL_CONV
 
 # Uncomment this line to apply all optimizations
 DEFINES += ALL_OPTIMIZATIONS

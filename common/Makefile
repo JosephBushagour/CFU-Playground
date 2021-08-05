@@ -156,8 +156,10 @@ $(SOFTWARE_ELF): $(OBJECTS) $(LDSCRIPTS)
 	$(QUIET) $(OBJDUMP) -s $(SOFTWARE_ELF) > $(SOFTWARE_ELF).sym
 
 %.h : %.tflite
+ifeq (,$(wildcard $@))
 	$(QUIET) echo "  XXD  $(notdir $<) $(notdir $@)"
 	$(QUIET) $(XXD) $< $@
+endif
 
 %.h : %.dat
 	$(QUIET) echo "  XXD  $(notdir $<) $(notdir $@)"

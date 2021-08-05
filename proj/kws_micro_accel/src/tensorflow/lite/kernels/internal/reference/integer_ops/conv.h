@@ -16,17 +16,19 @@ limitations under the License.
 #define TENSORFLOW_LITE_KERNELS_INTERNAL_REFERENCE_INTEGER_OPS_CONV_H_
 
 #include "tensorflow/lite/kernels/internal/common.h"
+#include "tensorflow/lite/kernels/internal/reference/integer_ops/kws_conv.h"
 
 namespace tflite {
 namespace reference_integer_ops {
 
 // Fixed-point per-channel-quantization convolution reference kernel.
 #if defined(OPT_LINK_OPS_IN_SRAM) || defined(ALL_OPTIMIZATIONS)
-inline void ConvPerChannel(
-    const ConvParams&, const int32_t*, const int32_t*, const RuntimeShape&,
-    const int8_t*, const RuntimeShape&, const int8_t*, const RuntimeShape&,
-    const int32_t*, const RuntimeShape&, int8_t*
-    ) __attribute__((always_inline));  // Must be inlined to be in SRAM.
+inline void ConvPerChannel(const ConvParams&, const int32_t*, const int32_t*,
+                           const RuntimeShape&, const int8_t*,
+                           const RuntimeShape&, const int8_t*,
+                           const RuntimeShape&, const int32_t*,
+                           const RuntimeShape&, int8_t*)
+    __attribute__((always_inline));  // Must be inlined to be in SRAM.
 #endif
 inline void ConvPerChannel(
     const ConvParams& params, const int32_t* output_multiplier,
@@ -68,6 +70,16 @@ inline void ConvPerChannel(
   const int filter_width = filter_shape.Dims(2);
   const int output_height = output_shape.Dims(1);
   const int output_width = output_shape.Dims(2);
+
+#if defined(OPT_ACCEL_CONV) || defined(ALL_OPTIMIZATIONS)
+  if (input_depth == 64 && input_offset == 128) {
+    KwsConvPerChannel(params, output_multiplier, output_shift, input_shape,
+                      input_data, filter_shape, filter_data, bias_shape,
+                      bias_data, output_shape, output_data);
+    return;
+  }
+#endif
+
   for (int batch = 0; batch < batches; ++batch) {
     for (int out_y = 0; out_y < output_height; ++out_y) {
       const int in_y_origin = (out_y * stride_height) - pad_height;

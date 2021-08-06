@@ -22,6 +22,36 @@
 namespace tflite {
 namespace reference_integer_ops {
 
+
+inline int32_t SaturatingRoundingDoublingHighMul(int32_t a,
+                                                 int32_t b) {
+  bool overflow = a == b && a == std::numeric_limits<int32_t>::min();
+  int64_t a_64(a);
+  int64_t b_64(b);
+  int64_t ab_64 = a_64 * b_64;
+  int32_t nudge = ab_64 >= 0 ? (1 << 30) : (1 - (1 << 30));
+  int32_t ab_x2_high32 =
+      static_cast<int32_t>((ab_64 + nudge) / (1ll << 31));
+  return overflow ? std::numeric_limits<int32_t>::max() : ab_x2_high32;
+}
+
+inline int32_t RoundingDivideByPOT(int32_t x, int exponent) {
+  const int32_t mask = (1ll << exponent) - 1;
+  const int32_t remainder = x & mask;
+  const int32_t threshold = (mask >> 1) + (x < 0);
+  return (x >> exponent) + (remainder > threshold);
+}
+
+inline int32_t KwsMultiplyByQuantizedMultiplier(int32_t x,
+                                             int32_t quantized_multiplier,
+                                             int shift) {
+  int left_shift = shift > 0 ? shift : 0;
+  int right_shift = shift > 0 ? 0 : -shift;
+  return RoundingDivideByPOT(SaturatingRoundingDoublingHighMul(
+                                 x * (1 << left_shift), quantized_multiplier),
+                             right_shift);
+}
+
 #if defined(OPT_LINK_OPS_IN_SRAM) || defined(ALL_OPTIMIZATIONS)
 void KwsConvPerChannel(const ConvParams&, const int32_t*, const int32_t*,
                        const RuntimeShape&, const int8_t*, const RuntimeShape&,
@@ -105,7 +135,7 @@ void KwsConvPerChannel(const ConvParams& params,
           if (bias_data) {
             acc += bias_data[out_channel];
           }
-          acc = MultiplyByQuantizedMultiplier(
+          acc = KwsMultiplyByQuantizedMultiplier(
               acc, output_multiplier[out_channel], output_shift[out_channel]);
           acc += output_offset;
           acc = std::max(acc, output_activation_min);

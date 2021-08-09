@@ -94,6 +94,7 @@ class KosagiFomuSoCWorkflow(ice40up5k.Ice40UP5KWorkflow):
         """Makes the Fomu SoC without a LedChaser to save LCs."""
         return super().make_soc(with_led_chaser=False,
                                 spi_flash_module='W25Q128JV',
+                                with_ctrl=False,
                                 with_timer=False,
                                 integrated_rom_init=[None],
                                 **kwargs)

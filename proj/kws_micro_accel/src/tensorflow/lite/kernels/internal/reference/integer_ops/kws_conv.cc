@@ -22,34 +22,17 @@
 namespace tflite {
 namespace reference_integer_ops {
 
-
-inline int32_t SaturatingRoundingDoublingHighMul(int32_t a,
-                                                 int32_t b) {
-  bool overflow = a == b && a == std::numeric_limits<int32_t>::min();
-  int64_t a_64(a);
-  int64_t b_64(b);
-  int64_t ab_64 = a_64 * b_64;
-  int32_t nudge = ab_64 >= 0 ? (1 << 30) : (1 - (1 << 30));
-  int32_t ab_x2_high32 =
-      static_cast<int32_t>((ab_64 + nudge) / (1ll << 31));
-  return overflow ? std::numeric_limits<int32_t>::max() : ab_x2_high32;
-}
-
-inline int32_t RoundingDivideByPOT(int32_t x, int exponent) {
-  const int32_t mask = (1ll << exponent) - 1;
-  const int32_t remainder = x & mask;
-  const int32_t threshold = (mask >> 1) + (x < 0);
-  return (x >> exponent) + (remainder > threshold);
-}
-
-inline int32_t KwsMultiplyByQuantizedMultiplier(int32_t x,
-                                             int32_t quantized_multiplier,
-                                             int shift) {
-  int left_shift = shift > 0 ? shift : 0;
-  int right_shift = shift > 0 ? 0 : -shift;
-  return RoundingDivideByPOT(SaturatingRoundingDoublingHighMul(
-                                 x * (1 << left_shift), quantized_multiplier),
-                             right_shift);
+inline int32_t KwsMultiplyByQuantizedMultiplier(int32_t acc, int32_t q_mult,
+                                                int shift) {
+  uint32_t top, bottom;
+  asm("mul  %[bottom], %[acc], %[q_mult]"
+      : [bottom] "=r"(bottom)
+      : [acc] "r"(acc), [q_mult] "r"(q_mult));
+  asm("mulh %[top], %[acc], %[q_mult]"
+      : [top] "=r"(top)
+      : [acc] "r"(acc), [q_mult] "r"(q_mult));
+  cfu_op0(0x2, top, bottom);
+  return cfu_op0(0x4, 0, shift);
 }
 
 #if defined(OPT_LINK_OPS_IN_SRAM) || defined(ALL_OPTIMIZATIONS)
@@ -75,7 +58,7 @@ void KwsConvPerChannel(const ConvParams& params,
   const int dilation_height_factor = params.dilation_height_factor;
   const int pad_width = params.padding_values.width;
   const int pad_height = params.padding_values.height;
-  const int32_t output_offset = params.output_offset;
+  // const int32_t output_offset = params.output_offset;
 
   // Set min and max value of the output.
   const int32_t output_activation_min = params.quantized_activation_min;
@@ -137,9 +120,6 @@ void KwsConvPerChannel(const ConvParams& params,
           }
           acc = KwsMultiplyByQuantizedMultiplier(
               acc, output_multiplier[out_channel], output_shift[out_channel]);
-          acc += output_offset;
-          acc = std::max(acc, output_activation_min);
-          acc = std::min(acc, output_activation_max);
           output_data[Offset(output_shape, batch, out_y, out_x, out_channel)] =
               static_cast<int8_t>(acc);
         }

@@ -17,9 +17,21 @@ limitations under the License.
 
 #include "tensorflow/lite/kernels/internal/common.h"
 #include "tensorflow/lite/kernels/internal/reference/integer_ops/kws_depthwise_conv.h"
-
+#include "kws_cfu.h"
 namespace tflite {
 namespace reference_integer_ops {
+inline int32_t KwsMultiplyByQuantizedMultiplier(int32_t acc, int32_t q_mult,
+                                                int shift) {
+  uint32_t top, bottom;
+  asm("mul  %[bottom], %[acc], %[q_mult]"
+      : [bottom] "=r"(bottom)
+      : [acc] "r"(acc), [q_mult] "r"(q_mult));
+  asm("mulh %[top], %[acc], %[q_mult]"
+      : [top] "=r"(top)
+      : [acc] "r"(acc), [q_mult] "r"(q_mult));
+  ROUNDING_DOUBLE_HIGH_MUL(top, bottom);
+  return ROUNDING_CLAMPING_DIVIDE_BY_POWER_OF_TWO(shift);
+}
 
 #if defined(OPT_LINK_OPS_IN_SRAM) || defined(ALL_OPTIMIZATIONS)
 inline void DepthwiseConvPerChannel(const DepthwiseParams&, const int32_t*,
@@ -46,8 +58,8 @@ inline void DepthwiseConvPerChannel(
   const int pad_width = params.padding_values.width;
   const int pad_height = params.padding_values.height;
   const int depth_multiplier = params.depth_multiplier;
-  const int32_t input_offset = params.input_offset;
-  const int32_t output_offset = params.output_offset;
+  // const int32_t input_offset = params.input_offset;
+  // const int32_t output_offset = params.output_offset;
   const int32_t output_activation_min = params.quantized_activation_min;
   const int32_t output_activation_max = params.quantized_activation_max;
 
@@ -87,7 +99,7 @@ inline void DepthwiseConvPerChannel(
             const int output_channel = m + in_channel * depth_multiplier;
             const int in_x_origin = (out_x * stride_width) - pad_width;
             const int in_y_origin = (out_y * stride_height) - pad_height;
-            int32_t acc = 0;
+            int32_t acc = RESET_ACC();
             for (int filter_y = 0; filter_y < filter_height; ++filter_y) {
               for (int filter_x = 0; filter_x < filter_width; ++filter_x) {
                 const int in_x = in_x_origin + dilation_width_factor * filter_x;
@@ -118,19 +130,20 @@ inline void DepthwiseConvPerChannel(
                   // we have seen so far.
                   // TODO(b/174275578): Add a check to make sure the
                   // accumulator depth is smaller than 2^16.
-                  acc += filter_val * (input_val + input_offset);
+                  acc = MAC(input_val, filter_val);
+                  // acc += filter_val * (input_val + input_offset);
                 }
               }
             }
             if (bias_data) {
               acc += bias_data[output_channel];
             }
-            acc = MultiplyByQuantizedMultiplier(
+            acc = KwsMultiplyByQuantizedMultiplier(
                 acc, output_multiplier[output_channel],
                 output_shift[output_channel]);
-            acc += output_offset;
-            acc = std::max(acc, output_activation_min);
-            acc = std::min(acc, output_activation_max);
+            // acc += output_offset;
+            // acc = std::max(acc, output_activation_min);
+            // acc = std::min(acc, output_activation_max);
             output_data[Offset(output_shape, batch, out_y, out_x,
                                output_channel)] = static_cast<int8_t>(acc);
           }

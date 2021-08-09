@@ -31,8 +31,8 @@ inline int32_t KwsMultiplyByQuantizedMultiplier(int32_t acc, int32_t q_mult,
   asm("mulh %[top], %[acc], %[q_mult]"
       : [top] "=r"(top)
       : [acc] "r"(acc), [q_mult] "r"(q_mult));
-  cfu_op0(0x2, top, bottom);
-  return cfu_op0(0x4, 0, shift);
+  ROUNDING_DOUBLE_HIGH_MUL(top, bottom);
+  return ROUNDING_CLAMPING_DIVIDE_BY_POWER_OF_TWO(shift);
 }
 
 #if defined(OPT_LINK_OPS_IN_SRAM) || defined(ALL_OPTIMIZATIONS)

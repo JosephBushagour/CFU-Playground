@@ -13,14 +13,15 @@
 // limitations under the License.
 
 module mac (
-  input logic [9:0]  function_id,
+  input logic        layer_one_en,
+  input logic        simd_en,
   input logic [31:0] input_vals,
   input logic [31:0] filter_vals,
 
   input  logic [31:0] acc,
   output logic [31:0] acc_next 
 );
-  localparam logic signed [8:0] InputOffest = 9'd128;
+  logic signed [8:0] InputOffest = layer_one_en ? -9'd83 : 9'd128;
 
   // Explicit rather than generated; saves LCs with current Yosys.
   logic signed [15:0] prod_0, prod_1, prod_2, prod_3;
@@ -36,10 +37,9 @@ module mac (
   // Conditionally MAC or SIMD MAC.
   logic signed [31:0] sum_prods;
   always_comb begin
-    if (function_id[0]) begin
-      sum_prods = prod_0;
-    end else begin
-      sum_prods = prod_0 + prod_1 + prod_2 + prod_3;
+    sum_prods = prod_0;
+    if (simd_en) begin
+      sum_prods += prod_1 + prod_2 + prod_3;
     end
   end
 

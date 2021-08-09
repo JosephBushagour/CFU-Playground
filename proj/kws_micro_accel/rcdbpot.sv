@@ -20,6 +20,8 @@ module rcdbpot (
   logic signed [31:0] mask, remainder, threshold;
   always_comb begin
     casez (exponent[3:0])
+      4'b?111: shift = 9;
+      4'b??11: shift = 5;
       4'b???1: shift = 7;
       4'b??1?: shift = 6;
       default: shift = 8;
@@ -35,7 +37,6 @@ module rcdbpot (
     if (|out[31:8]) begin
       out = 32'sd255;
     end
-
     out -= 32'sd128;
   end
 endmodule

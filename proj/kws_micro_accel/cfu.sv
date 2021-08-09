@@ -36,7 +36,8 @@ module Cfu (
 );
   logic [31:0] mac_output;
   mac kws_mac (
-      .function_id(cmd_payload_function_id),
+      .layer_one_en(cmd_payload_function_id[4]),
+      .simd_en(cmd_payload_function_id[3]),
       .input_vals(cmd_payload_inputs_0),
       .filter_vals(cmd_payload_inputs_1),
       .acc(rsp_payload_outputs_0),
@@ -57,18 +58,14 @@ module Cfu (
       .out(rcdbpot_output)
   );
 
-  // Accumulation.
   always_ff @(posedge clk) begin
     if (cmd_valid) begin
-      if (cmd_payload_function_id[3]) begin
-        rsp_payload_outputs_0 <= '0;
-      end else if(cmd_payload_function_id[4]) begin
-        rsp_payload_outputs_0 <= srdhm_output;
-      end else if(cmd_payload_function_id[5]) begin
-        rsp_payload_outputs_0 <= rcdbpot_output;
-      end else begin
-        rsp_payload_outputs_0 <= mac_output;
-      end
+      casez (cmd_payload_function_id[2:0])
+        3'b??1 : rsp_payload_outputs_0 <= mac_output;
+        3'b?1? : rsp_payload_outputs_0 <= srdhm_output;
+        3'b1?? : rsp_payload_outputs_0 <= rcdbpot_output;
+        default: rsp_payload_outputs_0 <= '0;
+      endcase
     end
   end
 
@@ -76,7 +73,7 @@ module Cfu (
   assign cmd_ready = ~rsp_valid;
   assign rsp_payload_response_ok = '1;
 
-  // Handshaking.
+  // Single cycle CFU handshaking.
   always_ff @(posedge clk) begin
     if (reset) begin
       rsp_valid <= '0;

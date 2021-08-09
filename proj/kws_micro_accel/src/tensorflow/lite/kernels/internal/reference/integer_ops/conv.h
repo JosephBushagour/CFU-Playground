@@ -17,9 +17,22 @@ limitations under the License.
 
 #include "tensorflow/lite/kernels/internal/common.h"
 #include "tensorflow/lite/kernels/internal/reference/integer_ops/kws_conv.h"
-
+#include "kws_cfu.h"
 namespace tflite {
 namespace reference_integer_ops {
+
+inline int32_t KwsMultiplyByQuantizedMultiplier(int32_t acc, int32_t q_mult,
+                                                int shift) {
+  uint32_t top, bottom;
+  asm("mul  %[bottom], %[acc], %[q_mult]"
+      : [bottom] "=r"(bottom)
+      : [acc] "r"(acc), [q_mult] "r"(q_mult));
+  asm("mulh %[top], %[acc], %[q_mult]"
+      : [top] "=r"(top)
+      : [acc] "r"(acc), [q_mult] "r"(q_mult));
+  ROUNDING_DOUBLE_HIGH_MUL(top, bottom);
+  return ROUNDING_CLAMPING_DIVIDE_BY_POWER_OF_TWO(shift);
+}
 
 // Fixed-point per-channel-quantization convolution reference kernel.
 #if defined(OPT_LINK_OPS_IN_SRAM) || defined(ALL_OPTIMIZATIONS)
@@ -45,7 +58,7 @@ inline void ConvPerChannel(
   const int dilation_height_factor = params.dilation_height_factor;
   const int pad_width = params.padding_values.width;
   const int pad_height = params.padding_values.height;
-  const int32_t output_offset = params.output_offset;
+  // const int32_t output_offset = params.output_offset;
 
   // Set min and max value of the output.
   const int32_t output_activation_min = params.quantized_activation_min;
@@ -86,7 +99,7 @@ inline void ConvPerChannel(
       for (int out_x = 0; out_x < output_width; ++out_x) {
         const int in_x_origin = (out_x * stride_width) - pad_width;
         for (int out_channel = 0; out_channel < output_depth; ++out_channel) {
-          int32_t acc = 0;
+          int32_t acc = RESET_ACC();
           for (int filter_y = 0; filter_y < filter_height; ++filter_y) {
             const int in_y = in_y_origin + dilation_height_factor * filter_y;
             for (int filter_x = 0; filter_x < filter_width; ++filter_x) {
@@ -122,7 +135,8 @@ inline void ConvPerChannel(
                 // we have seen so far.
                 // TODO(b/174275578): Add a check to make sure the
                 // accumulator depth is smaller than 2^16.
-                acc += filter_val * (input_val + input_offset);
+                acc = MAC_LAYER_ONE(input_val, filter_val);
+                // acc += filter_val * (input_val + input_offset);
               }
             }
           }
@@ -130,11 +144,12 @@ inline void ConvPerChannel(
           if (bias_data) {
             acc += bias_data[out_channel];
           }
-          acc = MultiplyByQuantizedMultiplier(
-              acc, output_multiplier[out_channel], output_shift[out_channel]);
-          acc += output_offset;
-          acc = std::max(acc, output_activation_min);
-          acc = std::min(acc, output_activation_max);
+          acc = KwsMultiplyByQuantizedMultiplier(acc, output_multiplier[out_channel], output_shift[out_channel]);
+          // acc = MultiplyByQuantizedMultiplier(
+          //     acc, output_multiplier[out_channel], output_shift[out_channel]);
+          // acc += output_offset;
+          // acc = std::max(acc, output_activation_min);
+          // acc = std::min(acc, output_activation_max);
           output_data[Offset(output_shape, batch, out_y, out_x, out_channel)] =
               static_cast<int8_t>(acc);
         }

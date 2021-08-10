@@ -18,10 +18,10 @@ module mac (
   input logic [31:0] input_vals,
   input logic [31:0] filter_vals,
 
-  input  logic [31:0] acc,
-  output logic [31:0] acc_next 
+  input  logic [31:0] curr_acc,
+  output logic [31:0] out 
 );
-  logic signed [8:0] InputOffest = layer_one_en ? -9'd83 : 9'd128;
+  logic signed [8:0] InputOffest = layer_one_en ? -9'sd83 : 9'sd128;
 
   // Explicit rather than generated; saves LCs with current Yosys.
   logic signed [15:0] prod_0, prod_1, prod_2, prod_3;
@@ -43,5 +43,5 @@ module mac (
     end
   end
 
-  assign acc_next = acc + sum_prods;
+  assign out = curr_acc + sum_prods;
 endmodule

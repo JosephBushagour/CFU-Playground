@@ -18,20 +18,25 @@ module rcdbpot (
 );
   logic [3:0] shift;
   logic signed [31:0] mask, remainder, threshold;
+  
   always_comb begin
-    casez (exponent[3:0])
-      4'b?111: shift = 9;
-      4'b??11: shift = 5;
-      4'b???1: shift = 7;
-      4'b??1?: shift = 6;
+    // Weird ordering is most effective for LC usage.
+    casez (exponent[2:0])
+      3'b111 : shift = 9;
+      3'b?11 : shift = 5;
+      3'b??1 : shift = 7;
+      3'b?1? : shift = 6;
       default: shift = 8;
     endcase
+    
     mask = ~({32{1'b1}} << shift);
     remainder = dividend & mask;
     threshold = (mask >> 1'b1) + dividend[31];
-    out = signed'(signed'(dividend) >>> shift)
-          + ((remainder > threshold) ? 1'b1 : 1'b0);
-    out = out[31] ? 32'sd0 : |out[31:8] ? 32'sd255 : out;
+    out = signed'(signed'(dividend) >>> shift);
+    
+    if (remainder > threshold) out += 1'b1;
+    if (out[31]) out = 32'sd0;
+    else if (|out[31:8]) out = 32'sd255;
     out -= 32'sd128;
   end
 endmodule

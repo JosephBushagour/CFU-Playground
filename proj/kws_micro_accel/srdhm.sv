@@ -16,10 +16,7 @@ module srdhm (
 
   output logic [31:0] out
 );
-  logic signed [63:0] q_acc;
-  assign q_acc = {top, bottom};
-  logic signed [31:0] nudge;
-  assign nudge = 32'sh40000000;
-  
-  assign out = (q_acc + nudge) >> 31;
+
+  assign out = (signed'({top, bottom}) + 32'sh40000000) >> 31;
+
 endmodule

@@ -40,8 +40,8 @@ module Cfu (
       .simd_en(cmd_payload_function_id[3]),
       .input_vals(cmd_payload_inputs_0),
       .filter_vals(cmd_payload_inputs_1),
-      .acc(rsp_payload_outputs_0),
-      .acc_next(mac_output)
+      .curr_acc(rsp_payload_outputs_0),
+      .out(mac_output)
   );
 
   logic [31:0] srdhm_output;

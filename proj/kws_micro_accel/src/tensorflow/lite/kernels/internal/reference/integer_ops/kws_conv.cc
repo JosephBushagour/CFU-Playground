@@ -22,19 +22,6 @@
 namespace tflite {
 namespace reference_integer_ops {
 
-inline int32_t KwsMultiplyByQuantizedMultiplier(int32_t acc, int32_t q_mult,
-                                                int shift) {
-  uint32_t top, bottom;
-  asm("mul  %[bottom], %[acc], %[q_mult]"
-      : [bottom] "=r"(bottom)
-      : [acc] "r"(acc), [q_mult] "r"(q_mult));
-  asm("mulh %[top], %[acc], %[q_mult]"
-      : [top] "=r"(top)
-      : [acc] "r"(acc), [q_mult] "r"(q_mult));
-  ROUNDING_DOUBLE_HIGH_MUL(top, bottom);
-  return ROUNDING_CLAMPING_DIVIDE_BY_POWER_OF_TWO(shift);
-}
-
 #if defined(OPT_LINK_OPS_IN_SRAM) || defined(ALL_OPTIMIZATIONS)
 void KwsConvPerChannel(const ConvParams&, const int32_t*, const int32_t*,
                        const RuntimeShape&, const int8_t*, const RuntimeShape&,

@@ -10,13 +10,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module srdhm (
+// Rounding doubling high 32 bits. Given a 64 bit integer as {top, bottom}
+// double and round to the nearest 2^32, outputting only the top half.
+
+module rdh (
+  // 64 bit integer as {top, bottom}
   input logic [31:0] top,
   input logic [31:0] bottom,
 
   output logic [31:0] out
 );
-
   assign out = (signed'({top, bottom}) + 32'sh40000000) >> 31;
-
 endmodule

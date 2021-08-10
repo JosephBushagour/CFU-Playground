@@ -11,9 +11,10 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 `include "mac.sv"
 `include "rcdbpot.sv"
-`include "srdhm.sv"
+`include "rdh.sv"
 
 module Cfu (
   input logic clk,
@@ -34,6 +35,7 @@ module Cfu (
   output logic rsp_valid,
   input  logic rsp_ready
 );
+  // Optionally SIMD multiply and accumulate with constant input offset.
   logic [31:0] mac_output;
   mac kws_mac (
       .layer_one_en(cmd_payload_function_id[4]),
@@ -44,25 +46,28 @@ module Cfu (
       .out(mac_output)
   );
 
-  logic [31:0] srdhm_output;
-  srdhm kws_srdhm (
+  // Rounding doubling high 32 bits.
+  logic [31:0] rdh_output;
+  rdh kws_rdh (
       .top(cmd_payload_inputs_0),
       .bottom(cmd_payload_inputs_1),
-      .out(srdhm_output)
+      .out(rdh_output)
   );
 
+  // Rounding clamping divide by power of two.
   logic [31:0] rcdbpot_output;
   rcdbpot kws_rcdbpot (
       .dividend(rsp_payload_outputs_0),
-      .exponent(cmd_payload_inputs_1),
+      .negative_exponent(cmd_payload_inputs_1),
       .out(rcdbpot_output)
   );
 
+  // Output selection (one-hot encoding).
   always_ff @(posedge clk) begin
     if (cmd_valid) begin
       casez (cmd_payload_function_id[2:0])
         3'b??1 : rsp_payload_outputs_0 <= mac_output;
-        3'b?1? : rsp_payload_outputs_0 <= srdhm_output;
+        3'b?1? : rsp_payload_outputs_0 <= rdh_output;
         3'b1?? : rsp_payload_outputs_0 <= rcdbpot_output;
         default: rsp_payload_outputs_0 <= '0;
       endcase

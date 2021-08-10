@@ -10,9 +10,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Rounding clamping divide by power of two. Given a dividend and a (negative)
+// representation of an exponent in the range [9:5], output the dividend
+// divided by 2^-negative_exponent correctly rounded up or down based on sign
+// and remainder. Clamped to the range [127,-128] and shifted by -128.
+
 module rcdbpot (
   input logic [31:0] dividend,
-  input logic [31:0] exponent,
+  input logic [31:0] negative_exponent,
 
   output logic [31:0] out
 );
@@ -21,7 +26,7 @@ module rcdbpot (
   
   always_comb begin
     // Weird ordering is most effective for LC usage.
-    casez (exponent[2:0])
+    casez (negative_exponent[2:0])
       3'b111 : shift = 9;
       3'b?11 : shift = 5;
       3'b??1 : shift = 7;

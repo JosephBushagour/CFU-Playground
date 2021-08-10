@@ -36,7 +36,7 @@ module rcdbpot (
     
     mask = ~({32{1'b1}} << shift);
     remainder = dividend & mask;
-    threshold = (mask >> 1'b1) + dividend[31];
+    threshold = (mask >> 1) + dividend[31];
     out = signed'(signed'(dividend) >>> shift);
     
     if (remainder > threshold) out += 1'b1;

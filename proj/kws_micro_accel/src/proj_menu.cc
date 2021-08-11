@@ -127,13 +127,14 @@ static void do_mac_tests() {
   }
 }
 
+// Tests hardware arithmetic CFU ops.
 static void do_arithmetic_tests() {
   bool all_passed = true;
 
   // For loops iterate over the delta of values seen during inference.
   for (int shift = -9; shift < -4; shift++) {
     printf("Starting shift: %d.\n", shift);
-    for (int32_t top = -7737; top < 10260; top += 20) {
+    for (int32_t top = -7737; top < 10260; top += 30) {
       for (int32_t bottom =-2146395217; bottom < 2146454171; bottom += 1000000) {
         int32_t sw = ROUNDING_DOUBLE_HIGH_SW(top, bottom);
         int32_t hw = ROUNDING_DOUBLE_HIGH_HW(top, bottom);

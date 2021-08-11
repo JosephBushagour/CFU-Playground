@@ -40,6 +40,7 @@
 #define ROUNDING_DOUBLE_HIGH_HW(top, bottom) cfu_op2_hw(0, top, bottom)
 #define ROUNDING_CLAMPING_DIVIDE_BY_POT_HW(shift) cfu_op4_hw(0, 0, shift)
 
+// Implements TFLM's MultiplyByQuantizedMultiplier function using CFU ops.
 inline int32_t KwsMultiplyByQuantizedMultiplier(int32_t acc, int32_t q_mult,
                                                 int shift) {
   uint32_t top, bottom;

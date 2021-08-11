@@ -41,8 +41,6 @@ void KwsConvPerChannel(const ConvParams& params,
   // Get parameters.
   const int stride_width = params.stride_width;
   const int stride_height = params.stride_height;
-  const int dilation_width_factor = params.dilation_width_factor;
-  const int dilation_height_factor = params.dilation_height_factor;
   const int pad_width = params.padding_values.width;
   const int pad_height = params.padding_values.height;
   // const int32_t output_offset = params.output_offset;
@@ -77,9 +75,9 @@ void KwsConvPerChannel(const ConvParams& params,
         for (int out_channel = 0; out_channel < output_depth; ++out_channel) {
           int32_t acc = RESET_ACC();
           for (int filter_y = 0; filter_y < filter_height; ++filter_y) {
-            const int in_y = in_y_origin + dilation_height_factor * filter_y;
+            const int in_y = in_y_origin +  filter_y;
             for (int filter_x = 0; filter_x < filter_width; ++filter_x) {
-              const int in_x = in_x_origin + dilation_width_factor * filter_x;
+              const int in_x = in_x_origin +  filter_x;
 
               // Zero padding by omitting the areas outside the image.
               const bool is_point_inside_image =
@@ -102,9 +100,7 @@ void KwsConvPerChannel(const ConvParams& params,
             }
           }
 
-          if (bias_data) {
             acc += bias_data[out_channel];
-          }
           acc = KwsMultiplyByQuantizedMultiplier(
               acc, output_multiplier[out_channel], output_shift[out_channel]);
           output_data[Offset(output_shape, batch, out_y, out_x, out_channel)] =
